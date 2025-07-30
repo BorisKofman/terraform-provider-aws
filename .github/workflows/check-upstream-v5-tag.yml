@@ -1,0 +1,46 @@
+name: Check for New Upstream v5.x Tag
+
+on:
+  schedule:
+    - cron: '0 21 * * *'  # 9:00 PM UTC = 11:00 PM Israel time
+  workflow_dispatch:  # manual trigger for testing
+
+jobs:
+  check-upstream-v5-tag:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout your fork
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Add upstream remote and fetch tags
+        run: |
+          git remote add upstream https://github.com/hashicorp/terraform-provider-aws.git
+          git fetch upstream --tags
+
+      - name: Get latest v5.x tag from upstream
+        id: upstream
+        run: |
+          LATEST_UPSTREAM_V5_TAG=$(git tag -l 'v5.*' --sort=-v:refname | head -n 1)
+          echo "latest_upstream_tag=$LATEST_UPSTREAM_V5_TAG" >> $GITHUB_OUTPUT
+          echo "🧭 Latest upstream v5 tag: $LATEST_UPSTREAM_V5_TAG"
+
+      - name: Get latest v5.x tag from fork
+        id: fork
+        run: |
+          LATEST_FORK_V5_TAG=$(git tag -l 'v5.*' --sort=-v:refname | head -n 1)
+          echo "latest_fork_tag=$LATEST_FORK_V5_TAG" >> $GITHUB_OUTPUT
+          echo "🪵 Latest fork v5 tag: $LATEST_FORK_V5_TAG"
+
+      - name: Compare latest v5 tags
+        run: |
+          if [ "${{ steps.upstream.outputs.latest_upstream_tag }}" != "${{ steps.fork.outputs.latest_fork_tag }}" ]; then
+            echo "🚨 New upstream v5 tag detected!"
+            echo "Upstream: ${{ steps.upstream.outputs.latest_upstream_tag }}"
+            echo "Fork:     ${{ steps.fork.outputs.latest_fork_tag }}"
+            exit 1
+          else
+            echo "✅ No new v5 tags. Fork is up to date."
+          fi
